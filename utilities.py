@@ -63,7 +63,7 @@ class DataGenerator(tf.keras.utils.Sequence):
     # create empty arrays of shape (batch_size,height,width,depth) 
     #Depth is 3 for input and depth is taken as 1 for output becasue mask consist only of 1 channel.
     X = np.empty((self.batch_size, self.img_h, self.img_w, 3))
-    y = np.empty((self.batch_size, self.img_h, self.img_w, 1))
+    y = np.empty((self.batch_size, self.img_h, self.img_w, 3))
 
     #iterate through the dataframe rows, whose size is equal to the batch_size
     for i in range(len(list_ids)):
@@ -74,31 +74,33 @@ class DataGenerator(tf.keras.utils.Sequence):
       mask_path = './' + str(list_mask[i])
       
       #reading the original image and the corresponding mask image
-      img = io.imread(img_path)
-      mask = io.imread(mask_path)
+      img = cv2.imread(img_path)
+      mask = cv2.imread(mask_path)
 
       #resizing and coverting them to array of type float64
-      img = cv2.resize(img,(self.img_h,self.img_w))
-      img = np.array(img, dtype = np.float64)
+      img = cv2.resize(img, (self.img_h, self.img_w), interpolation=cv2.INTER_NEAREST)
+      #img = np.array(img, dtype = np.float64)
       
-      mask = cv2.resize(mask,(self.img_h,self.img_w))
-      mask = np.array(mask, dtype = np.float64)
+      mask = cv2.resize(mask, (self.img_h, self.img_w), interpolation=cv2.INTER_NEAREST)
+      #mask = np.array(mask, dtype = np.float64)
 
       #standardising 
-      img -= img.mean()
-      img /= img.std()
-      
-      mask -= mask.mean()
-      mask /= mask.std()
+      # img -= img.mean()
+      # img /= img.std()
+      #
+      # mask -= mask.mean()
+      # mask /= mask.std()
+
+      img_and_mask = np.maximum(img, mask)
       
       #Adding image to the empty array
-      X[i,] = img
+      X[i,] = img/255
       
       #expanding the dimnesion of the image from (256,256) to (256,256,1)
-      y[i,] = np.expand_dims(mask, axis = 2)
+      y[i,] = img_and_mask/255
     
     #normalizing y
-    y = (y > 0).astype(int)
+    #y = (y > 0).astype(int)
 
     return X, y
 
@@ -215,8 +217,6 @@ def tversky_loss(y_true, y_pred):
     return 1 - tversky(y_true,y_pred)
 
 def focal_tversky(y_true,y_pred):
-    y_true = tf.cast(y_true, tf.float32)
-    y_pred = tf.cast(y_pred, tf.float32)
     pt_1 = tversky(y_true, y_pred)
     gamma = 0.75
     return K.pow((1-pt_1), gamma)
